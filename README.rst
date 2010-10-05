@@ -61,7 +61,14 @@ To use the task directly, import PurgeRequestTask from tasks.py thusly:
 
 Using PurgeRequest directly
 ---------------------------
-You may also import PurgeRequest from purge.py and use it directly.
+You may also import PurgeRequest from purge.py and use it directly. Not that only
+100 urls will be sent with each purge request, due to limits set by Akamai. If you
+add more than 100 urls, purge() will need to be called until none remain.
+
+If you don't provide a username and password when creating the PurgeRequest object,
+then your project's settings.py will be checked for AKAMAI_CCUAPI_USERNAME and
+AKAMAI_CCUAPI_PASSWORD. Failure to provide login info via either mechanism results
+in a NoAkamaiUsernameProvidedException and/or NoAkamaiPasswordProvidedException.
 
 Example:
 ::
@@ -81,8 +88,3 @@ Example:
 	 }                                                                              
 	>>> print pr.urls                                                               
 	[]
-	
-If you don't provide a username and password when creating the PurgeRequest object,
-then your project's settings.py will be checked for AKAMAI_CCUAPI_USERNAME and
-AKAMAI_CCUAPI_PASSWORD. Failure to provide login info via either mechanism results
-in a NoAkamaiUsernameProvidedException and/or NoAkamaiPasswordProvidedException.
