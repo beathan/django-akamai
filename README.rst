@@ -19,7 +19,13 @@ Required settings:
 	AKAMAI_CCUAPI_PASSWORD = 'ccuapi_password'
 	AKAMAI_CCUAPI_NOTIFICATION_EMAIL = 'your@email.com'
 
-There are a variety of ways to use this app in your app:
+There are a variety of ways to use this app in your app. 
+
+**PLEASE NOTE**: Currently, only 100 URLs will be purged per request, requiring 
+that you send additional signals/create additional tasks/call purge() again with 
+separate chunks of URLs/objects. The CCUAPI imposes a limit of "about" 100 URLs 
+of 400 characters each, so I have attempted to make the behavior transparent and 
+allow the end user to see the result of each request and respond accordingly.
 
 Using Signals
 -------------
