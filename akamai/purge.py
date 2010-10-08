@@ -72,8 +72,9 @@ class PurgeRequest(object):
         """
         self.wsdl = wsdl
         if not self.wsdl:
-            self.wsdl = os.path.join(os.path.dirname(__file__),
-                                     'ccuapi-axis.wsdl')
+            self.wsdl =\
+                os.path.join(os.path.split(os.path.abspath(__file__))[0],
+                             'ccuapi-axis.wsdl')
         self.client = Client("file://%s" % self.wsdl)
         self.username = username
         if not username:
