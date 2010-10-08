@@ -154,6 +154,18 @@ class PurgeRequest(object):
             self.urls = self.urls[100:]
         return self.last_result, num_purged_urls
 
+    def purge_all(self):
+        """
+        Purges all URLs in self.urls in batches of 100 using purge()
+
+        Returns a list containing the results of each request.
+        """
+        results = []
+        while self.urls:
+            purge_result = self.purge()
+            results.append(purge_result)
+        return results
+
     def convert_options(self):
         """
         Return the self.options dict as a list of strings in "k=v" format.
