@@ -1,3 +1,4 @@
+# encoding: utf-8
 """
 purge.py
 
@@ -39,6 +40,8 @@ IMPORTANT NOTE: The CCUAPI only supports "about" 100 URLs per purge request.
 For this reason, purge() will only attempt to purge 100 URLs at a time, and
 subsequent calls to purge() will be required to purge all URLs.
 """
+from __future__ import absolute_import
+
 import os.path
 
 from django.conf import settings
@@ -180,4 +183,4 @@ class PurgeRequest(object):
         return {"email-notification-name": email_notify_addr,
                 "action": "remove", # or 'invalidate'
                 "type": "arl", # or 'cpcode'
-                "domain": "production"} # or 'staging' 
+                "domain": "production"} # or 'staging'

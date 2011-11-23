@@ -1,3 +1,4 @@
+# encoding: utf-8
 """
 This module defines two signals, one that initiates a purge request directly,
 and another that queues the request. The queueing signal is conditionally
@@ -18,11 +19,14 @@ u'http://www.example.com/blahblah.html'
 Or:
 >>> queue_purge_request.send(obj)
 """
+from __future__ import absolute_import
+
 from django.dispatch import Signal
-from purge import PurgeRequest
+
+from .purge import PurgeRequest
 
 try:
-    from tasks import PurgeRequestTask
+    from .tasks import PurgeRequestTask
 except:
     tasks_available = False
 else:
