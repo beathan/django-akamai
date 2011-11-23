@@ -10,8 +10,6 @@ django-akamai serves as a means to perform purge requests from Django apps
 using the Akamai CCUAPI. Purge requests are performed on demand or, optionally,
 placed in a queue using Celery.
 
-This app comes bundled with a modified ccuapi-axis.wsdl that works with suds.
-
 Required settings:
 ::
 
@@ -26,6 +24,12 @@ that you send additional signals/create additional tasks/call purge() again with
 separate chunks of URLs/objects. The CCUAPI imposes a limit of "about" 100 URLs
 of 400 characters each, so I have attempted to make the behavior transparent and
 allow the end user to see the result of each request and respond accordingly.
+
+Consult Akamai's documentation_ for full information about the API. This app
+comes bundled with a modified copy of https://ccuapi.akamai.com/ccuapi-axis.wsdl
+which works with suds.
+
+.. _documentation: https://control.akamai.com/dl/customers/other/CCU/Content_Control_Interfaces.pdf
 
 Using Signals
 -------------
