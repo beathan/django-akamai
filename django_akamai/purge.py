@@ -77,9 +77,8 @@ class PurgeRequest(object):
         """
         self.wsdl = wsdl
         if not self.wsdl:
-            self.wsdl =\
-                os.path.join(os.path.split(os.path.abspath(__file__))[0],
-                             'ccuapi-axis.wsdl')
+            self.wsdl = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     'ccuapi-axis.wsdl')
         self.client = Client("file://%s" % self.wsdl)
         self.username = username
         if not username:
@@ -185,9 +184,10 @@ class PurgeRequest(object):
 
     @classmethod
     def default_options(self):
-        email_notify_addr =\
-            getattr(settings, 'AKAMAI_CCUAPI_NOTIFICATION_EMAIL', '')
+        email_notify_addr = getattr(settings,
+                                    'AKAMAI_CCUAPI_NOTIFICATION_EMAIL', '')
+
         return {"email-notification-name": email_notify_addr,
-                "action": "remove", # or 'invalidate'
-                "type": "arl", # or 'cpcode'
-                "domain": "production"} # or 'staging'
+                "action": "remove",      # or 'invalidate'
+                "type": "arl",           # or 'cpcode'
+                "domain": "production"}  # or 'staging'
