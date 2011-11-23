@@ -45,6 +45,8 @@ from __future__ import absolute_import
 import os.path
 
 from django.conf import settings
+from django.db.models.query import QuerySet
+
 from suds.client import Client
 
 
@@ -102,31 +104,36 @@ class PurgeRequest(object):
         instance is created.
         """
         self.urls = []
-        self.add(urls)
+
+        if urls is not None:
+            self.add(urls)
 
         # Used for storing the result of the last purge request
         self.last_result = None
 
     def add(self, urls=None):
         """
-        Add the provided urls to self.urls.
+        Add the provided urls to this purge request
 
-        The urls argument can be a single string, a list of strings,
-        or a queryset. If a queryset is passed, then each object must have
-        defined get_absolute_url() on the model.
+        The urls argument can be a single string, a list of strings, a queryset
+        or object. Objects, including those contained in a queryset, must
+        support get_absolute_url()
         """
-        if urls:
-            if isinstance(urls, list):
-                self.urls = self.urls + urls
-            elif isinstance(urls, basestring):
-                self.urls.append(urls)
-            elif urls.__class__.__name__ == 'QuerySet':
-                for obj in urls:
-                    self.urls.append(obj.get_absolute_url())
-            elif hasattr(urls, 'get_absolute_url'):
-                self.urls.append(urls.get_absolute_url())
-            else:
-                return
+
+        if urls is None:
+            raise TypeError("add a URL, list of URLs, queryset or object")
+
+        if isinstance(urls, list):
+            self.urls.extend(urls)
+        elif isinstance(urls, basestring):
+            self.urls.append(urls)
+        elif isinstance(urls, QuerySet):
+            for obj in urls:
+                self.urls.append(obj.get_absolute_url())
+        elif hasattr(urls, 'get_absolute_url'):
+            self.urls.append(urls.get_absolute_url())
+        else:
+            raise TypeError("Don't know how to handle %r" % urls)
 
     def purge(self):
         """
