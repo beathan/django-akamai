@@ -107,7 +107,7 @@ class PurgeRequest(object):
         """
         Get default options, then update with any user-provided options
         """
-        if getattr(settings, 'AKAMAI_CCUAPI_NOTIFICATION_EMAIL'):
+        if hasattr(settings, 'AKAMAI_CCUAPI_NOTIFICATION_EMAIL'):
             warn('''The AKAMAI_CCUAPI_NOTIFICATION_EMAIL setting is deprecated. '''
                  '''The new CCU purge API allows you to poll for purge status: '''
                  '''https://api.ccu.akamai.com/ccu/v2/docs/#section_CheckingPurgeStatus''',
