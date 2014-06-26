@@ -15,7 +15,6 @@ Required settings:
 
 	AKAMAI_CCUAPI_USERNAME = 'ccuapi_username'
 	AKAMAI_CCUAPI_PASSWORD = 'ccuapi_password'
-	AKAMAI_CCUAPI_NOTIFICATION_EMAIL = 'your@email.com'
 
 There are a variety of ways to use this app in your app.
 

@@ -11,7 +11,7 @@ setup(
     long_description=open('README.rst', 'r').read(),
     url='https://github.com/beathan/django-akamai',
     packages=['django_akamai'],
-    requires=['suds'],
+    requires=['requests'],
 
     # We need to include our WSDL file which means that we can't be installed
     # as an egg and must include a non-Python resource:
