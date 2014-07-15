@@ -1,13 +1,13 @@
 django-akamai
 =============
 
-Dependencies: suds_ (required), django-celery_ (optional)
+Dependencies: requests_ (required), django-celery_ (optional)
 
-.. _suds: https://fedorahosted.org/suds/
+.. _requests: http://python-requests.org/
 .. _django-celery: http://github.com/ask/django-celery
 
 django-akamai serves as a means to perform purge requests from Django apps
-using the Akamai CCUAPI. Purge requests are performed on demand or, optionally,
+using the Akamai REST API. Purge requests are performed on demand or, optionally,
 placed in a queue using Celery.
 
 Required settings:
@@ -18,17 +18,14 @@ Required settings:
 
 There are a variety of ways to use this app in your app.
 
-**PLEASE NOTE**: Currently, only 100 URLs will be purged per request, requiring
+**PLEASE NOTE**: Currently, only 200 URLs will be purged per request, requiring
 that you send additional signals/create additional tasks/call purge() again with
-separate chunks of URLs/objects. The CCUAPI imposes a limit of "about" 100 URLs
-of 400 characters each, so I have attempted to make the behavior transparent and
-allow the end user to see the result of each request and respond accordingly.
+separate chunks of URLs/objects.
 
-Consult Akamai's documentation_ for full information about the API. This app
-comes bundled with a modified copy of https://ccuapi.akamai.com/ccuapi-axis.wsdl
-which works with suds.
+Consult Akamai's documentation for full information about the API:
 
-.. _documentation: https://control.akamai.com/dl/customers/other/CCU/Content_Control_Interfaces.pdf
+https://api.ccu.akamai.com/ccu/v2/docs/
+
 
 Using Signals
 -------------
@@ -71,8 +68,10 @@ To use the task directly, import PurgeRequestTask from tasks.py thusly:
 Using PurgeRequest directly
 ---------------------------
 You may also import PurgeRequest from purge.py and use it directly. Not that
-only 100 urls will be sent with each purge request, due to limits set by Akamai.
-If you add more than 100 urls, purge() will need to be called until none remain.
+only 200 urls will be sent with each purge request, due to limits set by Akamai.
+If you add more than 200 urls, `purge()` will need to be called until none remain.
+Calling `purge_all()` will issue as many requests as needed for the full list,
+possibly taking a significant amount of time before returning.
 
 If you don't provide a username and password when creating the PurgeRequest
 object, then your project's settings.py will be checked for
