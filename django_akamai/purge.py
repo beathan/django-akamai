@@ -60,7 +60,6 @@ returned by the last purge request.
 from __future__ import absolute_import
 
 import json
-from urlparse import urljoin
 from warnings import warn
 
 import requests
@@ -68,6 +67,7 @@ from requests.auth import HTTPBasicAuth
 
 from django.conf import settings
 from django.db.models.query import QuerySet
+from six.moves.urllib.parse import urljoin
 
 
 class NoAkamaiUsernameProvidedException(Exception):

@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='django-akamai',
-    version='1.0.0',
+    version='1.0.1',
     description='A Django app for performing Akamai CCUAPI purge requests',
     author='Ben Boyd',
     author_email='beathan@gmail.com',
