@@ -54,13 +54,14 @@ TODO: discuss options for rate-limiting
 Example:
 ::
 
-	>>> pr = PurgeRequest(FIXME)
-	>>> pr.add("http://www.example.com/url-1.html")
-	>>> pr.add(u"http://www.example.com/url-2.html")
-	>>> urls_purged, responses = pr.purge()
-    ({u'purgeId': u'2d342226-1bca-11e7-bb13-c146e59a2657', u'progressUri': u'/ccu/v2/purges/2d342226-1bca-11e7-bb13-c146e59a2657', u'estimatedSeconds': 240, u'supportId': u'17PY1491594081381157-235812032', u'httpStatus': 201, u'detail': u'Request accepted.', u'pingAfterSeconds': 240}, 1)
-	>>> print pr.urls
-	[]
+    >>> pr = PurgeRequest()
+    >>> pr.add("http://www.example.com/url-1.html")
+    >>> pr.add(u"http://www.example.com/url-2.html")
+    >>> for url_batch, response in pr.purge():
+        print(resp.status_code, len(url_batch))
+    201 2
+    >>> print pr.urls
+    []
 
 
 Using Django Signals
@@ -77,16 +78,16 @@ object or QuerySet, then ``get_absolute_url()`` must be defined on every object.
 Example of signalling to immediately perform the request:
 ::
 
-	>>> from django_akamai.signals import purge_request, queue_purge_request
-	>>> obj = MyObject.objects.get(pk=3)
-	>>> obj.get_absolute_url()
-	u'http://www.example.com/blahblah.html'
-	>>> purge_request.send(obj)
+    >>> from django_akamai.signals import purge_request, queue_purge_request
+    >>> obj = MyObject.objects.get(pk=3)
+    >>> obj.get_absolute_url()
+    u'http://www.example.com/blahblah.html'
+    >>> purge_request.send(obj)
 
 Or, to queue the request using Celery:
 ::
 
-	>>> queue_purge_request.send(obj)
+    >>> queue_purge_request.send(obj)
 
 
 Using Tasks
@@ -94,8 +95,6 @@ Using Tasks
 To use the task directly, import ``PurgeRequestTask`` from tasks.py thusly:
 ::
 
-	>>> from akamai.tasks import PurgeRequestTask
-	>>> obj = MyObject.objects.get(pk=3)
-	>>> result = PurgeRequestTask.delay(obj)
-	>>> print result
-	1
+    >>> from akamai.tasks import PurgeRequestTask
+    >>> obj = MyObject.objects.get(pk=3)
+    >>> PurgeRequestTask.delay(obj)
