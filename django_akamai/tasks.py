@@ -21,5 +21,6 @@ class PurgeRequestTask(Task):
 
     def run(self, urls, **kwargs):
         pr = PurgeRequest(urls=urls)
-        result, num_urls = pr.purge()
+        num_urls = len(pr.urls)
+        pr.purge_all()
         return num_urls

@@ -40,8 +40,7 @@ purge_request = Signal()
 def purge_request_handler(sender, **kwargs):
     pr = PurgeRequest()
     pr.add(sender.get_absolute_url())
-    result = pr.purge()
-    return result
+    pr.purge_all()
 
 
 purge_request.connect(purge_request_handler)
