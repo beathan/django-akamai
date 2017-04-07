@@ -58,6 +58,8 @@ from django.db.models.query import QuerySet
 
 from six.moves.urllib.parse import urljoin
 
+logger = logging.getLogger(__name__)
+
 
 class InvalidAkamaiConfiguration(ImproperlyConfigured):
     pass
@@ -205,6 +207,8 @@ class PurgeRequest(object):
             if batch:
                 data = {'objects': batch}
 
+                logger.debug('Requesting Akamai purge %d URLs', len(batch))
+
                 response = requests.post(url=purge_url, auth=self.auth, data=json.dumps(data),
                                          headers={'Content-Type': 'application/json'})
 
@@ -218,12 +222,14 @@ class PurgeRequest(object):
 
                 yield batch, response
 
-    def purge_all(self, rate_limit_delay=30):
+    def purge_all(self, rate_limit_delay=60):
         '''Purge all pending URLs, waiting for API rate-limits if necessary!'''
 
         for batch, response in self.purge():
             if response.status_code == 507:
-                logging.info('API rate-limit detected; sleeping %d seconds')
+                details = response.json().get('detail', '<response did not contain "detail">')
+                logger.info('Will retry request in %d seconds due to API rate-limit: %s',
+                            rate_limit_delay, details)
                 time.sleep(rate_limit_delay)
 
     def check_purge_status(self, progress_uri):
