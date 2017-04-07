@@ -8,51 +8,36 @@ Example usage::
 
 >>> from pprint import pprint
 >>> from django_akamai.purge import PurgeRequest
->>> pr = PurgeRequest(username="ccuapi_user", password="1234567")
+>>> pr = PurgeRequest()
 >>> pr.add("http://www.example.com/url-1.html")
 >>> pr.add(u"http://www.example.com/url-2.html")
->>> response, number_of_urls = pr.purge()
->>> pprint(response)
-{"detail": "Request accepted.",
- "estimatedSeconds": 420,
- "httpStatus": 201,
- "pingAfterSeconds": 420,
- "progressUri": "/ccu/v2/purges/…",
- "purgeId": "…",
- "supportId": "…"}
->>> print pr.last_response.status_code
+>>> pr.purge_all()
+>>> pr.add(large_collection_of_urls)
+>>> for url_batch, response in pr.purge(): print(response.status_code)
 201
->>> print pr.urls
-[]
->>> pprint(pr.check_purge_status(response['progressUri']))
-{"originalEstimatedSeconds": 420,
- "purgeId": "…",
- "originalQueueLength": 0,
- "supportId": "…",
- "httpStatus": 200,
- "completionTime": "2014-05-23T15:24:55Z",
- "submittedBy": "…",
- "purgeStatus": "Done",
- "submissionTime": "2014-05-23T15:21:00Z"}
->>> pprint(pr.check_queue_length())
-{u'httpStatus': 200,
- u'detail': u'The queue may take a minute to reflect new or removed requests.',
- u'queueLength': 0,
- u'supportId': u'…'}
+201
+201
+507
 
-URLs can also be passed in when initially creating `PurgeRequest`. `QuerySet`s are
-also supported for models which define `get_absolute_url()`.
+URLs can also be passed in when initially creating `PurgeRequest` and will be
+passed to `PurgeRequest.add()` verbatim.
 
-The result of the request is returned when calling `purge()` and is also stored
-in `PurgeRequest` as `self.last_response`.
+In addition to the single URLs shown in the example above `PurgeRequest.add()`
+accepts lists or tuples of URLs as well as Django Model and QuerySet instances
+which implement `get_absolute_url()`.
 
-Result codes follow this pattern (from the CCUAPI docs):
+For general usage, `purge_all()` is recommended but `purge()` allows you to
+receive more information while requests are pending and possibly implement your
+own
+
+Result codes follow this pattern from the CCU API docs:
 201 - The removal request has been accepted.
 4xx - Invalid request
+507 - API rate-limit – try again later
 5xx - Contact Akamai support
 
-Check `self.last_response['detail']` for more information related to the `httpStatus`
-returned by the last purge request.
+API responses should be JSON objects containing a `detail` element with
+additional information.
 
 .. [1] See https://developer.akamai.com/api/purge/ccu/overview.html
 .. [2] See http://python-requests.org/
