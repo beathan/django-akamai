@@ -199,10 +199,8 @@ class PurgeRequest(object):
                 if not isinstance(next_url, bytes):
                     next_url = next_url.encode('utf-8')
 
-                next_size = len(next_url)
-
                 batch.append(next_url)
-                batch_size += next_size
+                batch_size += len(next_url)
 
             if batch:
                 data = {'objects': batch}
