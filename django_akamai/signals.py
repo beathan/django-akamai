@@ -19,6 +19,7 @@ u'http://www.example.com/blahblah.html'
 Or:
 >>> queue_purge_request.send(obj)
 """
+
 from __future__ import absolute_import
 
 from django.dispatch import Signal
@@ -27,7 +28,7 @@ from .purge import PurgeRequest
 
 try:
     from .tasks import PurgeRequestTask
-except:
+except ImportError:
     tasks_available = False
 else:
     tasks_available = True
@@ -35,11 +36,13 @@ else:
 
 purge_request = Signal()
 
+
 def purge_request_handler(sender, **kwargs):
     pr = PurgeRequest()
     pr.add(sender.get_absolute_url())
     result = pr.purge()
     return result
+
 
 purge_request.connect(purge_request_handler)
 
@@ -48,6 +51,6 @@ if tasks_available:
     queue_purge_request = Signal()
 
     def queue_purge_request_handler(sender, **kwargs):
-        result = PurgeRequestTask.delay(sender)
+        PurgeRequestTask.delay(sender)
 
     queue_purge_request.connect(queue_purge_request_handler)

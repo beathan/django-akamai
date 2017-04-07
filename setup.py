@@ -4,17 +4,15 @@ from setuptools import setup
 
 setup(
     name='django-akamai',
-    version='1.0.1',
+    version='2.0.0pre1',
     description='A Django app for performing Akamai CCUAPI purge requests',
     author='Ben Boyd',
     author_email='beathan@gmail.com',
     long_description=open('README.rst', 'r').read(),
     url='https://github.com/beathan/django-akamai',
     packages=['django_akamai'],
-    requires=['requests'],
-
-    # We need to include our WSDL file which means that we can't be installed
-    # as an egg and must include a non-Python resource:
-    include_package_data=True,
-    zip_safe=False,
+    requires=[
+        'requests[security]',
+        'edgegrid-python',
+    ],
 )

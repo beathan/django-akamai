@@ -16,7 +16,7 @@ from .purge import PurgeRequest
 
 
 class PurgeRequestTask(Task):
-    default_retry_delay = 60 * 2 # seconds here, so 2 minutes total
+    default_retry_delay = 60 * 2    # seconds here, so 2 minutes total
     max_retries = 5
 
     def run(self, urls, **kwargs):

@@ -54,100 +54,118 @@ Result codes follow this pattern (from the CCUAPI docs):
 Check `self.last_response['detail']` for more information related to the `httpStatus`
 returned by the last purge request.
 
-.. [1] See https://api.ccu.akamai.com/ccu/v2/docs/
+.. [1] See https://developer.akamai.com/api/purge/ccu/overview.html
 .. [2] See http://python-requests.org/
 """
+
 from __future__ import absolute_import
 
 import json
-from warnings import warn
+import logging
+import os
+import time
 
 import requests
-from requests.auth import HTTPBasicAuth
-
+from akamai.edgegrid import EdgeGridAuth, EdgeRc
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models.query import QuerySet
+
 from six.moves.urllib.parse import urljoin
 
 
-class NoAkamaiUsernameProvidedException(Exception):
+class InvalidAkamaiConfiguration(ImproperlyConfigured):
     pass
 
 
-class NoAkamaiPasswordProvidedException(Exception):
-    pass
+def load_edgegrid_client_settings():
+    '''Load Akamai EdgeGrid configuration
+
+    returns a (hostname, EdgeGridAuth) tuple from the following locations:
+
+    1. Values specified directly in the Django settings::
+        AKAMAI_CCU_CLIENT_SECRET
+        AKAMAI_CCU_HOST
+        AKAMAI_CCU_ACCESS_TOKEN
+        AKAMAI_CCU_CLIENT_TOKEN
+    2. An edgerc file specified in the AKAMAI_EDGERC_FILENAME settings
+    3. The default ~/.edgerc file
+
+    Both edgerc file load options will return the values from the “CCU” section
+    by default. This may be customized using the AKAMAI_EDGERC_CCU_SECTION setting.
+    '''
+
+    if getattr(settings, 'AKAMAI_CCU_CLIENT_SECRET', None):
+        # If the settings module has the values directly and they are not empty
+        # we'll use them without checking for an edgerc file:
+
+        host = settings.AKAMAI_CCU_HOST
+        auth = EdgeGridAuth(access_token=settings.AKAMAI_CCU_ACCESS_TOKEN,
+                            client_token=settings.AKAMAI_CCU_CLIENT_TOKEN,
+                            client_secret=settings.AKAMAI_CCU_CLIENT_SECRET)
+        return host, auth
+    else:
+        edgerc_section = getattr(settings, 'AKAMAI_EDGERC_CCU_SECTION', 'CCU')
+
+        edgerc_path = getattr(settings, 'AKAMAI_EDGERC_FILENAME', '~/.edgerc')
+        edgerc_path = os.path.expanduser(edgerc_path)
+
+        if os.path.isfile(edgerc_path):
+            edgerc = EdgeRc(edgerc_path)
+            host = edgerc.get(edgerc_section, 'host')
+            auth = EdgeGridAuth.from_edgerc(edgerc, section=edgerc_section)
+            return host, auth
+
+        raise InvalidAkamaiConfiguration('Cannot find Akamai client configuration!')
 
 
 class PurgeRequest(object):
-    def __init__(self, username=None, password=None, options=None, urls=None,
-                 ccu_base_url='https://api.ccu.akamai.com'):
+    #: 50KB limit from https://developer.akamai.com/api/purge/ccu/overview.html#limits allowing for overhead
+    MAX_REQUEST_SIZE = 45000
+
+    def __init__(self, urls=None, action='delete', network='production',
+                 edgegrid_host=None, edgegrid_auth=None):
+        """Issue purge requests for the provided URL(s)
+
+        `urls` may be a single string, a list or tuple, or a Django QuerySet or
+        Model instance which implements `get_absolute_url()` — see `add()`.
+
+        `action` is passed directly to the API and has the same options documented
+        by Akamai. Currently it should be either `invalidate` or `delete`.
+
+        `network` is passed directly to the API and has the same options documented
+        by Akamai. Currently it should be either `staging` or `production`.
+
+        Authentication is performed by the edgegrid-python library. If you wish to
+        provide the host and a configured EdgeGridAuth instance you may pass those
+        values directly. Otherwise, values will be obtained from the sources
+        supported by the `load_edgegrid_client_settings()` function.
+
+        See https://developer.akamai.com/api/purge/ccu/overview.html
+        and https://developer.akamai.com/api/purge/ccu/resources.html
         """
-        PurgeRequest requires a username and password with access to the CCUAPI
-        service. This can be passed in as an init argument or kept in the
-        Django settings file.
-        """
 
-        self.ccu_base_url = ccu_base_url
+        if edgegrid_auth is not None and edgegrid_host is not None:
+            self.host = edgegrid_host
+            self.auth = edgegrid_auth
+        else:
+            self.host, self.auth = load_edgegrid_client_settings()
 
-        self.username = username
-        if not username:
-            self.username = getattr(settings, 'AKAMAI_CCUAPI_USERNAME', None)
+        self.action = action
+        self.network = network
 
-        self.password = password
-        if not password:
-            self.password = getattr(settings, 'AKAMAI_CCUAPI_PASSWORD', None)
-
-        if not self.username:
-            raise NoAkamaiUsernameProvidedException
-        if not self.password:
-            raise NoAkamaiPasswordProvidedException
-
-        self.http_auth = HTTPBasicAuth(self.username, self.password)
-
-        """
-        Get default options, then update with any user-provided options
-        """
-        if hasattr(settings, 'AKAMAI_CCUAPI_NOTIFICATION_EMAIL'):
-            warn('''The AKAMAI_CCUAPI_NOTIFICATION_EMAIL setting is deprecated. '''
-                 '''The new CCU purge API allows you to poll for purge status: '''
-                 '''https://api.ccu.akamai.com/ccu/v2/docs/#section_CheckingPurgeStatus''',
-                 DeprecationWarning)
-
-        # See https://api.ccu.akamai.com/ccu/v2/docs/#section_PurgeRequest
-        self.options = {'action': 'remove',
-                        'type': 'arl',
-                        'domain': 'production'}
-        if options:
-            self.options.update(options)
-
-        """
-        Define an empty urls list and add any urls provided when the
-        instance is created.
-        """
         self.urls = []
 
         if urls is not None:
             self.add(urls)
 
-        # Used for storing the result of the last purge request
-        self.last_response = None
-
-    @property
-    def last_result(self):
-        warn('`last_result` has been replaced with `last_response`', DeprecationWarning)
-        return self.last_response
-
-    def add(self, urls=None):
+    def add(self, urls):
         """
         Add the provided urls to this purge request
 
         The urls argument can be a single string, a list of strings, a queryset
-        or object. Objects, including those contained in a queryset, must
-        support get_absolute_url()
+        or model instance. Models must implement `get_absolute_url()`.
         """
-
-        if urls is None:
-            raise TypeError("add a URL, list of URLs, queryset or object")
 
         if isinstance(urls, (list, tuple)):
             self.urls.extend(urls)
@@ -161,86 +179,70 @@ class PurgeRequest(object):
         else:
             raise TypeError("Don't know how to handle %r" % urls)
 
-    def purge(self, purge_batch_size=200):
-        """Issue a purge request
+    def purge(self):
+        """Submit purge request(s) to the CCU API
 
-        Only `purge_batch_size` urls will be sent in a single purge request. If self.urls contains more
-        items, purge() will need to be called multiple times
+        Since a purge call may require multiple API requests and may trigger rate-limiting
+        this method uses a generator to provide the results of each request, allowing you to
+        communicate request progress or implement a custom rate-limiting response::
 
-        On success, returns the decoded JSON result of the purge request and the number of urls sent in the
-        request.
-        On error, returns None. The full `Response` object is available as
+            for url_batch, response in purge_request.purge():
+                if response.ok:
+                    # update progress
+                elif response.status_code == 507:
+                    # Rate-limiting. Do something?
+
+        If you simply want a function which blocks until all of the purge requests have been
+        issued, use `purge_all()`.
+
+        Both `purge()` and `purge_all()` will raise HTTP exceptions for any error response
+        other than rate-limiting.
         """
 
-        self.last_response = None
+        purge_url = urljoin('https://%s' % self.host, '/ccu/v3/%s/url/%s' % (self.action, self.network))
 
-        urls_slice = self.urls[:purge_batch_size]
-
-        if urls_slice:
-            purge_url = urljoin(self.ccu_base_url, '/ccu/v2/queues/default')
-
-            data = {'type': self.options['type'],
-                    'domain': self.options['domain'],
-                    'objects': urls_slice}
-
-            self.last_response = requests.post(url=purge_url, data=json.dumps(data),
-                                               auth=self.http_auth,
-                                               headers={'Content-Type': 'application/json'})
-
-            if self.last_response.ok:
-                self.urls = self.urls[purge_batch_size:]
-                return self.last_response.json(), len(urls_slice)
-            else:
-                return None, 0
-
-    def purge_all(self):
-        """
-        Purges all URLs by calling purge() until self.urls is empty
-
-        Returns a list containing the results of each request.
-        """
-        results = []
         while self.urls:
-            purge_result = self.purge()
-            results.append(purge_result)
-        return results
+            # We'll accumulate
+            batch = []
+            batch_size = 0
+
+            while self.urls and batch_size < self.MAX_REQUEST_SIZE:
+                next_url = self.urls.pop()
+
+                if not isinstance(next_url, bytes):
+                    next_url = next_url.encode('utf-8')
+
+                next_size = len(next_url)
+
+                batch.append(next_url)
+                batch_size += next_size
+
+            if batch:
+                data = {'objects': batch}
+
+                response = requests.post(url=purge_url, auth=self.auth, data=json.dumps(data),
+                                         headers={'Content-Type': 'application/json'})
+
+                if not response.ok:
+                    # We'll return the current batch to the queue so they can be retried later:
+                    self.urls.extend(batch)
+
+                    # Raise an exception for errors other than rate-limiting:
+                    if response.status_code != 507:
+                        response.raise_for_status()
+
+                yield batch, response
+
+    def purge_all(self, rate_limit_delay=30):
+        '''Purge all pending URLs, waiting for API rate-limits if necessary!'''
+
+        for batch, response in self.purge():
+            if response.status_code == 507:
+                logging.info('API rate-limit detected; sleeping %d seconds')
+                time.sleep(rate_limit_delay)
 
     def check_purge_status(self, progress_uri):
-        """
-        Check the status of a purge request using the ``progressUri`` value obtained from a previous purge
-        request
-
-        Returns the decoded JSON response::
-
-        {
-            "originalEstimatedSeconds": 420,
-            "purgeId": "…",
-            "originalQueueLength": 0,
-            "supportId": "…",
-            "httpStatus": 200,
-            "completionTime": "2014-05-23T15:24:55Z",
-            "submittedBy": "…",
-            "purgeStatus": "Done",
-            "submissionTime": "2014-05-23T15:21:00Z"
-        }
-        """
-
-        resp = requests.get(url=urljoin(self.ccu_base_url, progress_uri),
-                            auth=self.http_auth)
-        return resp.json()
+        raise DeprecationWarning('The CCU v3 API does not support purge status checks')
 
     def check_queue_length(self):
-        """Check the current length of the purge request queue
-
-        Returns the decoded JSON response::
-
-        {
-            u'httpStatus': 200,
-            u'detail': u'The queue may take a minute to reflect new or removed requests.',
-            u'queueLength': 0,
-            u'supportId': u'…'
-        }
-        """
-        resp = requests.get(url=urljoin(self.ccu_base_url, '/ccu/v2/queues/default'),
-                            auth=self.http_auth)
-        return resp.json()
+        raise DeprecationWarning('The CCU v3 API does not support queue length checks')

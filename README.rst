@@ -10,29 +10,64 @@ django-akamai serves as a means to perform purge requests from Django apps
 using the Akamai REST API. Purge requests are performed on demand or, optionally,
 placed in a queue using Celery.
 
-Required settings:
-::
+Configuration
+-------------
 
-	AKAMAI_CCUAPI_USERNAME = 'ccuapi_username'
-	AKAMAI_CCUAPI_PASSWORD = 'ccuapi_password'
+This library uses the edgegrid-python_ client for authentication. If the
+`~/.edgerc` config file contains a `CCU` section those credentials will be used
+automatically.
 
-There are a variety of ways to use this app in your app.
+To specify a different location for the edgerc file, you may use these Django
+settings::
 
-**PLEASE NOTE**: Currently, only 200 URLs will be purged per request, requiring
-that you send additional signals/create additional tasks/call ``purge()`` again with
-separate chunks of URLs/objects.
+    AKAMAI_EDGERC_FILENAME
+    AKAMAI_EDGERC_CCU_SECTION
+
+If you prefer to keep the values in your Django settings you may specify them
+directly:
+
+    AKAMAI_CCU_CLIENT_SECRET
+    AKAMAI_CCU_HOST
+    AKAMAI_CCU_ACCESS_TOKEN
+    AKAMAI_CCU_CLIENT_TOKEN
+
+For simplicity and security use of the `.edgerc` file is recommended.
 
 Consult Akamai's documentation for full information about the API:
 
-https://api.ccu.akamai.com/ccu/v2/docs/
+https://developer.akamai.com/api/purge/ccu/overview.html
+
+.. _edgegrid-python: https://pypi.python.org/pypi/edgegrid-python
 
 
-Using Signals
--------------
-signals.py defines two signals, one that initiates a purge request directly,
-and another that queues the request. The queueing signal is conditionally
-defined and depends on the successful import of ``PurgeRequestTask``, which depends
-on django-celery being installed.
+Directly issuing purge requests
+-------------------------------
+
+You may import ``PurgeRequest`` from ``django_akamai.purge`` and provide it with
+one or more URLs to invalidate or delete.
+
+Note that Akamai's API specifies a byte limit on the number of requests and a
+single purge call may require multiple HTTP requests to complete.
+
+TODO: discuss options for rate-limiting
+
+Example:
+::
+
+	>>> pr = PurgeRequest(FIXME)
+	>>> pr.add("http://www.example.com/url-1.html")
+	>>> pr.add(u"http://www.example.com/url-2.html")
+	>>> urls_purged, responses = pr.purge()
+    ({u'purgeId': u'2d342226-1bca-11e7-bb13-c146e59a2657', u'progressUri': u'/ccu/v2/purges/2d342226-1bca-11e7-bb13-c146e59a2657', u'estimatedSeconds': 240, u'supportId': u'17PY1491594081381157-235812032', u'httpStatus': 201, u'detail': u'Request accepted.', u'pingAfterSeconds': 240}, 1)
+	>>> print pr.urls
+	[]
+
+
+Using Django Signals
+--------------------
+
+``django_akamai.signals`` defines two signals to directly issue a purge request
+or, when Celery is available, queue the request.
 
 When sending these signals from other apps, you can pass in a variety of things
 as the sender for convenience. Sender can be a single URL string, a list of
@@ -42,7 +77,7 @@ object or QuerySet, then ``get_absolute_url()`` must be defined on every object.
 Example of signalling to immediately perform the request:
 ::
 
-	>>> from akamai.signals import purge_request, queue_purge_request
+	>>> from django_akamai.signals import purge_request, queue_purge_request
 	>>> obj = MyObject.objects.get(pk=3)
 	>>> obj.get_absolute_url()
 	u'http://www.example.com/blahblah.html'
@@ -64,36 +99,3 @@ To use the task directly, import ``PurgeRequestTask`` from tasks.py thusly:
 	>>> result = PurgeRequestTask.delay(obj)
 	>>> print result
 	1
-
-Using PurgeRequest directly
----------------------------
-You may also import ``PurgeRequest`` from purge.py and use it directly. Not that
-only 200 urls will be sent with each purge request, due to limits set by Akamai.
-If you add more than 200 urls, ``purge()`` will need to be called until none remain.
-Calling ``purge_all()`` will issue as many requests as needed for the full list,
-possibly taking a significant amount of time before returning.
-
-If you don't provide a username and password when creating the PurgeRequest
-object, then your project's settings.py will be checked for
-``AKAMAI_CCUAPI_USERNAME`` and ``AKAMAI_CCUAPI_PASSWORD``. Failure to provide login info
-via either mechanism results in a ``NoAkamaiUsernameProvidedException`` and/or
-``NoAkamaiPasswordProvidedException``.
-
-Example:
-::
-
-	>>> pr = PurgeRequest(username="ccuapi_user", password="1234567")
-	>>> pr.add("http://www.example.com/url-1.html")
-	>>> pr.add(u"http://www.example.com/url-2.html")
-	>>> req = pr.purge()
-	>>> print pr.last_result
-	(PurgeResult){
-	   resultCode = 100
-	   resultMsg = "Success."
-	   sessionID = "987654321"
-	   estTime = 420
-	   uriIndex = -1
-	   modifiers[] = <empty>
-	 }
-	>>> print pr.urls
-	[]
