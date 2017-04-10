@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='django-akamai',
-    version='2.0.0.dev3',
+    use_scm_version=True,
     description='A Django app for performing Akamai purge requests',
     author='Ben Boyd',
     author_email='beathan@gmail.com',
@@ -15,4 +15,7 @@ setup(
         'requests[security]',
         'edgegrid-python',
     ],
+    setup_requires=[
+        'setuptools_scm',
+    ]
 )
